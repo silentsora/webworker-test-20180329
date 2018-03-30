@@ -6,7 +6,6 @@
  */
 
 const initCanvas = () => {
-    let loadNum = 0;
     const grey1 = [];
     const grey2 = [];
     let sumList = [];
@@ -100,7 +99,43 @@ const initCanvas = () => {
     //     }
     // };
 
-    function workerText () {
+    // function workerText () {
+    //     const compareImg = (x0, y0, img1Width, img2Width, img2Height, grey1, grey2) => {
+    //         let sum = 0;
+
+    //         for (let x = x0; x < img2Width + x0; x++) {
+    //             for (let y = y0; y < img2Height + y0; y++) {
+    //                 sum += Math.abs(grey1[x + y * img1Width] - grey2[(x - x0) + (y - y0) * img2Width]);
+    //             }
+    //         }
+
+    //         return parseFloat((sum / (img2Width * img2Height)).toFixed(2));
+    //     };
+
+    //     onmessage = (e) => {
+    //         let sumList = [];
+    //         let i = 0;
+
+    //         let data = JSON.parse(e.data);
+
+    //         let xStart = Math.floor(data.xStart);
+    //         let yStart = Math.floor(data.yStart);
+    //         let xEnd = Math.floor(data.xEnd);
+    //         let yEnd = Math.floor(data.yEnd);
+
+    //         for (let x0 = xStart; x0 < xEnd; x0++) {
+    //             for (let y0 = yStart; y0 < yEnd; y0++) {
+    //                 sumList[i] = compareImg(x0, y0, data.img1Width, data.img2Width, data.img2Height, data.grey1, data.grey2);
+    //                 i++;
+    //             }
+    //         }
+
+    //         postMessage(sumList);
+    //         close();
+    //     };
+    // }
+
+    const workerCode = `
         const compareImg = (x0, y0, img1Width, img2Width, img2Height, grey1, grey2) => {
             let sum = 0;
 
@@ -134,12 +169,13 @@ const initCanvas = () => {
             postMessage(sumList);
             close();
         };
-    }
+    `;
 
     const detectImgInWorker = () => {
         let startTime = new Date();
         let completeNum = 0;
-        const workerBlob = new Blob([workerText.toString().replace(/^function .+\{?|\}$|\};$/g, '')], {type: 'text/javascript'});
+        // const workerBlob = new Blob([workerText.toString().replace(/^function .+\{?|\}$|\};$/g, '')], {type: 'text/javascript'});
+        const workerBlob = new Blob([workerCode]);
         const workerUrl = window.URL.createObjectURL(workerBlob);
 
         const completeHandler = () => {
@@ -156,28 +192,11 @@ const initCanvas = () => {
             worker.onerror = (e) => {
                 throw e.message;
             };
-
-            if (index === 0) {
-                worker.onmessage = (e) => {
+            worker.onmessage = (e) => {
+                if (index === 0) {
                     sumList = sumList.concat(e.data);
                     completeNum++;
-                };
-
-                let postData = {
-                    xStart: 0,
-                    yStart: 0,
-                    xEnd: (img1.width - img2.width) / 4,
-                    yEnd: img1.height - img2.height,
-                    img1Width: img1.width,
-                    img2Width: img2.width,
-                    img2Height: img2.height,
-                    grey1: grey1,
-                    grey2: grey2
-                };
-
-                worker.postMessage(JSON.stringify(postData));
-            } else {
-                worker.onmessage = (e) => {
+                } else {
                     let inv = setInterval(() => {
                         if (completeNum === index) {
                             clearInterval(inv);
@@ -189,22 +208,22 @@ const initCanvas = () => {
                             }
                         }
                     }, 30);
-                };
+                }
+            };
 
-                let postData = {
-                    xStart: (img1.width - img2.width) * index / 4,
-                    yStart: 0,
-                    xEnd: (img1.width - img2.width) * (index + 1) / 4,
-                    yEnd: img1.height - img2.height,
-                    img1Width: img1.width,
-                    img2Width: img2.width,
-                    img2Height: img2.height,
-                    grey1: grey1,
-                    grey2: grey2
-                };
+            let postData = {
+                xStart: (img1.width - img2.width) * index / 4,
+                yStart: 0,
+                xEnd: (img1.width - img2.width) * (index + 1) / 4,
+                yEnd: img1.height - img2.height,
+                img1Width: img1.width,
+                img2Width: img2.width,
+                img2Height: img2.height,
+                grey1: grey1,
+                grey2: grey2
+            };
 
-                worker.postMessage(JSON.stringify(postData));
-            }
+            worker.postMessage(JSON.stringify(postData));
         };
 
         // 划分成四个区域分别计算
@@ -250,17 +269,9 @@ const initCanvas = () => {
     };
 
     const loadImg = () => {
-        img1.onload = () => {
-            loadNum++;
-            if (loadNum === 2) {
-                drawImage();
-                getImageData();
-                document.querySelector('.btn-single').style.display = 'inline-block';
-                document.querySelector('.btn-multiple').style.display = 'inline-block';
-            }
-        };
+        let loadNum = 0;
 
-        img2.onload = () => {
+        const onloadHandler = () => {
             loadNum++;
             if (loadNum === 2) {
                 drawImage();
@@ -269,6 +280,8 @@ const initCanvas = () => {
                 document.querySelector('.btn-multiple').style.display = 'inline-block';
             }
         };
+        img1.onload = onloadHandler;
+        img2.onload = onloadHandler;
 
         document.querySelector('.btn-single').addEventListener('click', detectImg);
         document.querySelector('.btn-multiple').addEventListener('click', detectImgInWorker);

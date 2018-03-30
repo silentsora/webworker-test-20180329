@@ -28,16 +28,12 @@
 | 公用配置           | webpack.config.base.js     |            |                      |                  |         |               |
 | 开发              | webpack.config.dev.js      |            | npm run dev          | 否               |dev       |               |
 | 测试              | webpack.config.prod.js     |  ／         | npm run dist        | dist             |dist      |是 (保留console.log)|
-| 线上              | webpack.config.prod.js     |  cnd地址    | npm run build       | dist             |prod      |是              |
-| 交接              | webpack.config.handover.js |  客户提供    | npm run handover    | dist／ossweb-img |handover  |否              |
-| 交接zip           | webpack.config.zip.js      |  客户提供    | npm run zip         | dist／           |zip       |是              |
+| 线上              | webpack.config.prod.js     |  cdn地址    | npm run build       | dist             |prod      |是              |
 
 
 > 资源路径配置文件： `config.path.js` cdn与交接地址根据自己项目需求修改对应地址即可。
 
 > webpack-dev-server 后在浏览器打开的ip是0.0.0.0:3000,如要在手机测试请在浏览将0.0.0.0替换为本机ip即可。
-
-> 新增`npm run zip` 直接拉取config.path.js中项目名生成文件夹和压缩包，方便上传QCP；
 
 ## License
 
