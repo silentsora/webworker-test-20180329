@@ -5,26 +5,6 @@
  * @version $Id$
  */
 
-// web worker preload test
-
-// let workerList = [];
-// let order = 0;
-
-// import '../less/style.less';
-
-// const createWorker = () => {
-//     const worker = new Worker(require('./worker-preload.js'));
-
-//     worker.onerror = (error) => {
-//         console.log(error.message);
-//         throw error;
-//     };
-
-//     worker.onmessage = (e) => {
-//         console.log(e.data);
-//     };
-// };
-
 const initCanvas = () => {
     let loadNum = 0;
     const grey1 = [];
@@ -56,33 +36,37 @@ const initCanvas = () => {
         }
     };
 
-    // const detectImg = () => {
-    //     const compareImg = (x0, y0) => {
-    //         let sum = 0;
+    const detectImg = () => {
+        const compareImg = (x0, y0) => {
+            let sum = 0;
 
-    //         for (let x = x0; x < img2.width + x0; x++) {
-    //             for (let y = y0; y < img2.height + y0; y++) {
-    //                 sum += Math.abs(grey1[x + y * img1.width] - grey2[(x - x0) + (y - y0) * img2.width]);
-    //             }
-    //         }
+            for (let x = x0; x < img2.width + x0; x++) {
+                for (let y = y0; y < img2.height + y0; y++) {
+                    sum += Math.abs(grey1[x + y * img1.width] - grey2[(x - x0) + (y - y0) * img2.width]);
+                }
+            }
 
-    //         return parseFloat((sum / (img2.width * img2.height)).toFixed(2));
-    //     };
+            return parseFloat((sum / (img2.width * img2.height)).toFixed(2));
+        };
 
-    //     let i = 0;
-    //     let startTime = new Date();
+        let i = 0;
+        let startTime = new Date();
 
-    //     for (let x0 = 0; x0 <= img1.width - img2.width; x0++) {
-    //         for (let y0 = 0; y0 <= img1.height - img2.height; y0++) {
-    //             sumList[i] = compareImg(x0, y0);
-    //             i++;
-    //         }
-    //     }
+        for (let x0 = 0; x0 < img1.width - img2.width; x0++) {
+            for (let y0 = 0; y0 < img1.height - img2.height; y0++) {
+                sumList[i] = compareImg(x0, y0);
+                i++;
+            }
+        }
 
-    //     let endTime = new Date();
-    //     let passTime = endTime - startTime;
-    //     console.log(passTime);
-    // };
+        showArea();
+
+        let endTime = new Date();
+        let passTime = endTime - startTime;
+        console.log(`passTime: ${passTime}ms`);
+
+        document.querySelector('.single-time').innerHTML = 'single: ' + passTime + 'ms';
+    };
 
     // const detectImgInWorker = () => {
     //     let i = 0;
@@ -116,71 +100,118 @@ const initCanvas = () => {
     //     }
     // };
 
+    function workerText () {
+        const compareImg = (x0, y0, img1Width, img2Width, img2Height, grey1, grey2) => {
+            let sum = 0;
+
+            for (let x = x0; x < img2Width + x0; x++) {
+                for (let y = y0; y < img2Height + y0; y++) {
+                    sum += Math.abs(grey1[x + y * img1Width] - grey2[(x - x0) + (y - y0) * img2Width]);
+                }
+            }
+
+            return parseFloat((sum / (img2Width * img2Height)).toFixed(2));
+        };
+
+        onmessage = (e) => {
+            let sumList = [];
+            let i = 0;
+
+            let data = JSON.parse(e.data);
+
+            let xStart = Math.floor(data.xStart);
+            let yStart = Math.floor(data.yStart);
+            let xEnd = Math.floor(data.xEnd);
+            let yEnd = Math.floor(data.yEnd);
+
+            for (let x0 = xStart; x0 < xEnd; x0++) {
+                for (let y0 = yStart; y0 < yEnd; y0++) {
+                    sumList[i] = compareImg(x0, y0, data.img1Width, data.img2Width, data.img2Height, data.grey1, data.grey2);
+                    i++;
+                }
+            }
+
+            postMessage(sumList);
+            close();
+        };
+    }
+
     const detectImgInWorker = () => {
         let startTime = new Date();
         let completeNum = 0;
-        // const workerBlob = new Blob([document.getElementById('workerImg').textContent]);
-        const workerBlob = new Blob(Array.prototype.map.call(document.querySelectorAll('script[type="text/js-worker"]'), function (oScript) { return oScript.textContent; }), {type: 'text/javascript'});
+        const workerBlob = new Blob([workerText.toString().replace(/^function .+\{?|\}$|\};$/g, '')], {type: 'text/javascript'});
         const workerUrl = window.URL.createObjectURL(workerBlob);
-        // console.log(workerBlob);
+
+        const completeHandler = () => {
+            showArea();
+            let endTime = new Date();
+            let passTime = endTime - startTime;
+            console.log(`passTime: ${passTime}ms`);
+            document.querySelector('.multiple-time').innerHTML = 'multiple: ' + passTime + 'ms';
+        };
+
+        const createWorker = (index) => {
+            const worker = new Worker(workerUrl);
+
+            worker.onerror = (e) => {
+                throw e.message;
+            };
+
+            if (index === 0) {
+                worker.onmessage = (e) => {
+                    sumList = sumList.concat(e.data);
+                    completeNum++;
+                };
+
+                let postData = {
+                    xStart: 0,
+                    yStart: 0,
+                    xEnd: (img1.width - img2.width) / 4,
+                    yEnd: img1.height - img2.height,
+                    img1Width: img1.width,
+                    img2Width: img2.width,
+                    img2Height: img2.height,
+                    grey1: grey1,
+                    grey2: grey2
+                };
+
+                worker.postMessage(JSON.stringify(postData));
+            } else {
+                worker.onmessage = (e) => {
+                    let inv = setInterval(() => {
+                        if (completeNum === index) {
+                            clearInterval(inv);
+                            sumList = sumList.concat(e.data);
+                            completeNum++;
+
+                            if (completeNum === 4) {
+                                completeHandler();
+                            }
+                        }
+                    }, 30);
+                };
+
+                let postData = {
+                    xStart: (img1.width - img2.width) * index / 4,
+                    yStart: 0,
+                    xEnd: (img1.width - img2.width) * (index + 1) / 4,
+                    yEnd: img1.height - img2.height,
+                    img1Width: img1.width,
+                    img2Width: img2.width,
+                    img2Height: img2.height,
+                    grey1: grey1,
+                    grey2: grey2
+                };
+
+                worker.postMessage(JSON.stringify(postData));
+            }
+        };
 
         // 划分成四个区域分别计算
-
-        const worker1 = new Worker(workerUrl);
-        worker1.onmessage = (e) => {
-            sumList = sumList.concat(e.data);
-            completeNum++;
-
-            if (completeNum === 4) {
-                showArea();
-                let endTime = new Date();
-                let passTime = endTime - startTime;
-                console.log(`passTime: ${passTime}ms`);
-            }
-        };
-        worker1.postMessage([0, 0, (img1.width - img2.width) / 4, img1.height - img2.height, img1.width, img2.width, img2.height, grey1, grey2]);
-
-        const worker2 = new Worker(workerUrl);
-        worker2.onmessage = (e) => {
-            sumList = sumList.concat(e.data);
-            completeNum++;
-
-            if (completeNum === 4) {
-                showArea();
-                let endTime = new Date();
-                let passTime = endTime - startTime;
-                console.log(`passTime: ${passTime}ms`);
-            }
-        };
-        worker2.postMessage([(img1.width - img2.width) / 4, 0, (img1.width - img2.width) * 2 / 4, img1.height - img2.height, img1.width, img2.width, img2.height, grey1, grey2]);
-
-        const worker3 = new Worker(workerUrl);
-        worker3.onmessage = (e) => {
-            sumList = sumList.concat(e.data);
-            completeNum++;
-
-            if (completeNum === 4) {
-                showArea();
-                let endTime = new Date();
-                let passTime = endTime - startTime;
-                console.log(`passTime: ${passTime}ms`);
-            }
-        };
-        worker3.postMessage([(img1.width - img2.width) * 2 / 4, 0, (img1.width - img2.width) * 3 / 4, img1.height - img2.height, img1.width, img2.width, img2.height, grey1, grey2]);
-
-        const worker4 = new Worker(workerUrl);
-        worker4.onmessage = (e) => {
-            sumList = sumList.concat(e.data);
-            completeNum++;
-
-            if (completeNum === 4) {
-                showArea();
-                let endTime = new Date();
-                let passTime = endTime - startTime;
-                console.log(`passTime: ${passTime}ms`);
-            }
-        };
-        worker4.postMessage([(img1.width - img2.width) * 3 / 4, 0, img1.width - img2.width, img1.height - img2.height, img1.width, img2.width, img2.height, grey1, grey2]);
+        createWorker(0);
+        createWorker(1);
+        createWorker(2);
+        createWorker(3);
     };
 
     const showArea = () => {
@@ -224,9 +255,8 @@ const initCanvas = () => {
             if (loadNum === 2) {
                 drawImage();
                 getImageData();
-                // detectImg();
-                detectImgInWorker();
-                // showArea();
+                document.querySelector('.btn-single').style.display = 'inline-block';
+                document.querySelector('.btn-multiple').style.display = 'inline-block';
             }
         };
 
@@ -235,15 +265,16 @@ const initCanvas = () => {
             if (loadNum === 2) {
                 drawImage();
                 getImageData();
-                // detectImg();
-                detectImgInWorker();
-                // showArea();
+                document.querySelector('.btn-single').style.display = 'inline-block';
+                document.querySelector('.btn-multiple').style.display = 'inline-block';
             }
         };
+
+        document.querySelector('.btn-single').addEventListener('click', detectImg);
+        document.querySelector('.btn-multiple').addEventListener('click', detectImgInWorker);
     };
 
     loadImg();
 };
 
 initCanvas();
-// createWorker();

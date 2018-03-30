@@ -63,13 +63,13 @@ module.exports = function (env) {
                     'PATH': JSON.stringify(isProduction() ? config.prod : config.dist)
                 }
             }),
-            new ExtractTextPlugin('css/[name].[hash:8].css'),
-            new UglifyJSPlugin({
-                comments: false,
-                compress: {
-                    drop_console: !!isProduction()
-                }
-            })
+            new ExtractTextPlugin('css/[name].[hash:8].css')
+            // new UglifyJSPlugin({
+            //     comments: false,
+            //     compress: {
+            //         drop_console: !!isProduction()
+            //     }
+            // })
         ]
     });
 }
